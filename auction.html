@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cricket Auction Live Bidding Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        .team-panel {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .team-panel:hover {
+            transform: scale(1.05);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        
+        .team-panel.active {
+            transform: scale(1.1);
+            box-shadow: 0 25px 50px rgba(255,215,0,0.4);
+            border: 4px solid #ffd700;
+        }
+        
+        .team-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .team-panel:hover::before {
+            left: 100%;
+        }
+        
+        .pulse-bid {
+            animation: pulseBid 1s infinite;
+        }
+        
+        @keyframes pulseBid {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .bid-flash {
+            animation: bidFlash 0.5s ease-out;
+        }
+        
+        @keyframes bidFlash {
+            0% { background-color: #ffd700; transform: scale(1.1); }
+            100% { background-color: transparent; transform: scale(1); }
+        }
+        
+        .navy-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
+        .red-gradient { background: linear-gradient(135deg, #dc2626 0%, #f87171 100%); }
+        .green-gradient { background: linear-gradient(135deg, #059669 0%, #34d399 100%); }
+        .purple-gradient { background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); }
+        .orange-gradient { background: linear-gradient(135deg, #ea580c 0%, #fb923c 100%); }
+        .center-gradient { background: linear-gradient(135deg, #1f2937 0%, #374151 100%); }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'bounce-slow': 'bounce 2s infinite',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-900 min-h-screen overflow-hidden">
+    <!-- Top Navigation -->
+    <nav class="bg-gray-800 shadow-lg border-b-2 border-yellow-500 relative z-50">
+        <div class="max-w-full mx-auto px-6">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-yellow-400">🏏 Live Cricket Auction</h1>
+                    <div class="ml-8 flex items-center space-x-4">
+                        <div class="text-white text-sm">
+                            <span class="text-gray-400">Current Bid:</span>
+                            <span class="text-2xl font-bold text-yellow-400">$<span id="currentBidDisplay">0</span></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="showSetupModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        Setup
+                    </button>
+                    <button onclick="soldPlayer()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold transition-colors">
+                        SOLD!
+                    </button>
+                    <button onclick="unsoldPlayer()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold transition-colors">
+                        UNSOLD
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Auction Layout -->
+    <div class="relative h-screen">
+        <!-- Team 1 - Top Left -->
+        <div id="team1" class="team-panel absolute top-4 left-4 w-80 h-48 navy-gradient rounded-2xl p-6 text-white shadow-2xl" onclick="bidForTeam(1)">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold" id="team1Name">Team 1</h2>
+                    <p class="text-sm opacity-80" id="team1City">City</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm opacity-80">Budget Left</p>
+                    <p class="text-xl font-bold" id="team1Budget">₹0</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <p class="opacity-80">Players</p>
+                    <p class="text-lg font-bold" id="team1Players">0</p>
+                </div>
+                <div>
+                    <p class="opacity-80">Spent</p>
+                    <p class="text-lg font-bold" id="team1Spent">₹0</p>
+                </div>
+            </div>
+            <div class="absolute bottom-2 right-2 text-xs opacity-60">Click to Bid</div>
+        </div>
+
+        <!-- Team 2 - Top Right -->
+        <div id="team2" class="team-panel absolute top-4 right-4 w-80 h-48 red-gradient rounded-2xl p-6 text-white shadow-2xl" onclick="bidForTeam(2)">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold" id="team2Name">Team 2</h2>
+                    <p class="text-sm opacity-80" id="team2City">City</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm opacity-80">Budget Left</p>
+                    <p class="text-xl font-bold" id="team2Budget">₹0</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <p class="opacity-80">Players</p>
+                    <p class="text-lg font-bold" id="team2Players">0</p>
+                </div>
+                <div>
+                    <p class="opacity-80">Spent</p>
+                    <p class="text-lg font-bold" id="team2Spent">₹0</p>
+                </div>
+            </div>
+            <div class="absolute bottom-2 right-2 text-xs opacity-60">Click to Bid</div>
+        </div>
+
+        <!-- Team 3 - Bottom Left -->
+        <div id="team3" class="team-panel absolute bottom-4 left-4 w-80 h-48 green-gradient rounded-2xl p-6 text-white shadow-2xl" onclick="bidForTeam(3)">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold" id="team3Name">Team 3</h2>
+                    <p class="text-sm opacity-80" id="team3City">City</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm opacity-80">Budget Left</p>
+                    <p class="text-xl font-bold" id="team3Budget">₹0</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <p class="opacity-80">Players</p>
+                    <p class="text-lg font-bold" id="team3Players">0</p>
+                </div>
+                <div>
+                    <p class="opacity-80">Spent</p>
+                    <p class="text-lg font-bold" id="team3Spent">₹0</p>
+                </div>
+            </div>
+            <div class="absolute bottom-2 right-2 text-xs opacity-60">Click to Bid</div>
+        </div>
+
+        <!-- Team 4 - Bottom Right -->
+        <div id="team4" class="team-panel absolute bottom-4 right-4 w-80 h-48 purple-gradient rounded-2xl p-6 text-white shadow-2xl" onclick="bidForTeam(4)">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold" id="team4Name">Team 4</h2>
+                    <p class="text-sm opacity-80" id="team4City">City</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm opacity-80">Budget Left</p>
+                    <p class="text-xl font-bold" id="team4Budget">₹0</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <p class="opacity-80">Players</p>
+                    <p class="text-lg font-bold" id="team4Players">0</p>
+                </div>
+                <div>
+                    <p class="opacity-80">Spent</p>
+                    <p class="text-lg font-bold" id="team4Spent">₹0</p>
+                </div>
+            </div>
+            <div class="absolute bottom-2 right-2 text-xs opacity-60">Click to Bid</div>
+        </div>
+
+        <!-- Center Player Display -->
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-80">
+            <div id="playerCard" class="center-gradient rounded-3xl p-8 text-white shadow-2xl h-full flex flex-col justify-center items-center">
+                <div class="text-center">
+                    <div class="w-24 h-24 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-4" id="playerAvatar">
+                        ?
+                    </div>
+                    <h3 class="text-3xl font-bold mb-2" id="playerName">No Player Selected</h3>
+                    <p class="text-lg opacity-80 mb-2" id="playerRole">Select a player to start auction</p>
+                    <p class="text-sm opacity-60 mb-4" id="playerDetails">Country • Age</p>
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="bg-black bg-opacity-30 rounded-lg p-3">
+                            <p class="text-xs opacity-80" id="playerLastTeam">Last Team: N/A</p>
+                        </div>
+                        <div class="bg-black bg-opacity-30 rounded-lg p-3">
+                            <p class="text-xs opacity-80" id="playerLastPrice">Last Season: $0</p>
+                        </div>
+                    </div>
+                    <div class="bg-black bg-opacity-30 rounded-lg p-4 mb-4">
+                        <p class="text-sm opacity-80">Base Price</p>
+                        <p class="text-2xl font-bold text-yellow-400" id="playerBasePrice">$0</p>
+                    </div>
+                    <div class="bg-black bg-opacity-30 rounded-lg p-4">
+                        <p class="text-sm opacity-80">Current Bid</p>
+                        <p class="text-3xl font-bold text-green-400" id="playerCurrentBid">$0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bidding History Panel -->
+        <div class="absolute top-20 left-1/2 transform -translate-x-1/2 w-96 bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-4">
+            <h4 class="text-white font-bold mb-3 text-center">Recent Bids</h4>
+            <div id="biddingHistory" class="space-y-2 max-h-32 overflow-y-auto">
+                <div class="text-white text-center py-4 opacity-60 text-sm">No bids yet</div>
+            </div>
+        </div>
+
+        <!-- Auction Stats -->
+        <div class="absolute bottom-20 left-1/2 transform -translate-x-1/2 flex space-x-4">
+            <div class="bg-green-600 rounded-lg p-3 text-white text-center min-w-20">
+                <p class="text-xs opacity-80">Sold</p>
+                <p class="text-xl font-bold" id="soldCount">0</p>
+            </div>
+            <div class="bg-red-600 rounded-lg p-3 text-white text-center min-w-20">
+                <p class="text-xs opacity-80">Unsold</p>
+                <p class="text-xl font-bold" id="unsoldCount">0</p>
+            </div>
+            <div class="bg-yellow-600 rounded-lg p-3 text-white text-center min-w-20">
+                <p class="text-xs opacity-80">Total Value</p>
+                <p class="text-lg font-bold" id="totalValue">₹0</p>
+            </div>
+        </div>
+
+        <!-- Last Bidder Indicator -->
+        <div id="lastBidder" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-0 transition-all duration-500">
+            <div class="bg-yellow-400 text-black px-6 py-3 rounded-full font-bold text-lg shadow-lg">
+                <span id="lastBidderText">Team Name Bid!</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Setup Modal -->
+    <div id="setupModal" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-screen overflow-y-auto m-4">
+            <div class="p-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-2xl">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-3xl font-bold">Auction Setup</h2>
+                    <button onclick="hideSetupModal()" class="text-white hover:text-gray-300 text-2xl">×</button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <!-- Team Setup -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <h3 class="text-2xl font-bold mb-4 text-gray-800">Team Setup</h3>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <input type="text" id="setupTeam1Name" placeholder="Team 1 Name" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <input type="text" id="setupTeam1City" placeholder="City" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <input type="number" id="setupTeam1Budget" placeholder="Team 1 Budget ($)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <input type="text" id="setupTeam2Name" placeholder="Team 2 Name" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
+                                <input type="text" id="setupTeam2City" placeholder="City" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
+                            </div>
+                            <input type="number" id="setupTeam2Budget" placeholder="Team 2 Budget ($)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <input type="text" id="setupTeam3Name" placeholder="Team 3 Name" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                                <input type="text" id="setupTeam3City" placeholder="City" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <input type="number" id="setupTeam3Budget" placeholder="Team 3 Budget ($)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <input type="text" id="setupTeam4Name" placeholder="Team 4 Name" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                <input type="text" id="setupTeam4City" placeholder="City" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <input type="number" id="setupTeam4Budget" placeholder="Team 4 Budget ($)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                            
+                            <button onclick="setupTeams()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition-colors">
+                                Setup Teams
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Player Setup -->
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <h3 class="text-2xl font-bold mb-4 text-gray-800">Add Player</h3>
+                        <div class="space-y-4">
+                            <input type="text" id="setupPlayerName" placeholder="Player Name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                            <select id="setupPlayerRole" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                                <option value="">Select Role</option>
+                                <option value="Batsman">Batsman</option>
+                                <option value="Bowler">Bowler</option>
+                                <option value="All-rounder">All-rounder</option>
+                                <option value="Wicket-keeper">Wicket-keeper</option>
+                            </select>
+                            <div class="grid grid-cols-2 gap-4">
+                                <input type="text" id="setupPlayerCountry" placeholder="Country" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                                <input type="number" id="setupPlayerAge" placeholder="Age" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                            </div>
+                            <input type="number" id="setupPlayerBasePrice" placeholder="Base Price ($)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                            <div class="grid grid-cols-2 gap-4">
+                                <input type="text" id="setupPlayerLastTeam" placeholder="Last Team (Optional)" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                                <input type="number" id="setupPlayerLastPrice" placeholder="Last Season Price ($)" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                            </div>
+                            <button onclick="addPlayer()" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 rounded-lg font-bold transition-colors">
+                                Add Player
+                            </button>
+                        </div>
+
+                        <!-- Player List -->
+                        <div class="mt-6">
+                            <h4 class="font-bold text-gray-700 mb-3">Available Players</h4>
+                            <div id="playersList" class="max-h-48 overflow-y-auto space-y-2">
+                                <div class="text-gray-500 text-center py-4">No players added yet</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Google Sheets Integration -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+                    <h3 class="text-xl font-bold mb-3 text-blue-800">📊 Google Sheets Integration</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Google API Key</label>
+                            <input type="text" id="googleApiKey" placeholder="Enter your Google Sheets API Key" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="syncWithGoogleSheets()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold transition-colors">
+                                📥 Sync Data
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-sm text-blue-700 space-y-2">
+                        <p><strong>Connected Sheet:</strong> <a href="https://docs.google.com/spreadsheets/d/1gpTy138FN4iFOgAE9znSsS0EKafAuXm1jrqKSuPFDRA/edit" target="_blank" class="text-blue-600 underline">Cricket Auction Sheet</a></p>
+                        <p><strong>Status:</strong> <span id="syncStatus" class="font-medium text-gray-600">Ready to sync</span></p>
+                        <div class="bg-white p-3 rounded border">
+                            <p class="font-medium mb-1">Quick Setup:</p>
+                            <ol class="list-decimal list-inside space-y-1 text-xs">
+                                <li>Get API key from <a href="https://console.cloud.google.com/" target="_blank" class="text-blue-600 underline">Google Cloud Console</a></li>
+                                <li>Enable Google Sheets API</li>
+                                <li>Make your sheet public or add API key permissions</li>
+                                <li>Click "Sync Data" to load players and teams</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Auction Controls -->
+                <div class="bg-gray-50 rounded-xl p-6">
+                    <h3 class="text-2xl font-bold mb-4 text-gray-800">Auction Controls</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Bid Increment ($)</label>
+                            <input type="number" id="setupBidIncrement" value="50000" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Select Player for Auction</label>
+                            <select id="setupCurrentPlayer" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                <option value="">Choose Player</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="startPlayerAuction()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-bold transition-colors">
+                                Start Auction
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let teams = [
+            { id: 1, name: 'Team 1', city: 'City', totalBudget: 0, remainingBudget: 0, players: [], totalSpent: 0 },
+            { id: 2, name: 'Team 2', city: 'City', totalBudget: 0, remainingBudget: 0, players: [], totalSpent: 0 },
+            { id: 3, name: 'Team 3', city: 'City', totalBudget: 0, remainingBudget: 0, players: [], totalSpent: 0 },
+            { id: 4, name: 'Team 4', city: 'City', totalBudget: 0, remainingBudget: 0, players: [], totalSpent: 0 }
+        ];
+        
+        let players = [];
+        let currentAuctionPlayer = null;
+        let currentBidAmount = 0;
+        let bidIncrement = 50000;
+        let biddingHistory = [];
+        let soldPlayers = [];
+        let unsoldPlayers = [];
+        let lastBiddingTeam = null;
+
+        // Google Sheets configuration
+        const SPREADSHEET_ID = '1gpTy138FN4iFOgAE9znSsS0EKafAuXm1jrqKSuPFDRA';
+        const PLAYERS_RANGE = 'Players!A:J';
+        const TEAMS_RANGE = 'Teams!A:F';
+
+        // Google Sheets API functions
+        async function syncWithGoogleSheets() {
+            const apiKey = document.getElementById('googleApiKey').value;
+            if (!apiKey) {
+                alert('Please enter your Google API Key first');
+                return;
+            }
+
+            updateSyncStatus('Syncing with Google Sheets...');
+
+            try {
+                // Load players data
+                await loadPlayersFromSheet(apiKey);
+                // Load teams data
+                await loadTeamsFromSheet(apiKey);
+                
+                updateSyncStatus('✅ Sync completed successfully');
+                updatePlayersList();
+                updatePlayersDropdown();
+                updateTeamDisplays();
+                
+                alert('Data synced successfully from Google Sheets!');
+            } catch (error) {
+                console.error('Sync error:', error);
+                updateSyncStatus('❌ Sync failed - Check API key and sheet permissions');
+                alert('Sync failed. Please check your API key and sheet permissions.');
+            }
+        }
+
+        async function loadPlayersFromSheet(apiKey) {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${PLAYERS_RANGE}?key=${apiKey}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.values && data.values.length > 1) {
+                players = [];
+                // Skip header row
+                for (let i = 1; i < data.values.length; i++) {
+                    const row = data.values[i];
+                    if (row[0]) { // If name exists
+                        const player = {
+                            id: Date.now() + i,
+                            name: row[0] || '',
+                            role: row[1] || '',
+                            country: row[2] || 'Unknown',
+                            age: parseInt(row[3]) || 'Unknown',
+                            basePrice: parseInt(row[4]) || 0,
+                            status: row[5] || 'available',
+                            soldTo: row[6] || '',
+                            soldPrice: parseInt(row[7]) || 0,
+                            lastTeam: row[8] || 'N/A',
+                            lastSeasonPrice: parseInt(row[9]) || 0
+                        };
+                        players.push(player);
+                    }
+                }
+            }
+        }
+
+        async function loadTeamsFromSheet(apiKey) {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${TEAMS_RANGE}?key=${apiKey}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.values && data.values.length > 1) {
+                // Skip header row
+                for (let i = 1; i < Math.min(data.values.length, 5); i++) {
+                    const row = data.values[i];
+                    if (row[0] && teams[i-1]) { // If team name exists
+                        teams[i-1] = {
+                            id: i,
+                            name: row[0] || `Team ${i}`,
+                            city: row[1] || 'City',
+                            totalBudget: parseInt(row[2]) || 0,
+                            remainingBudget: parseInt(row[3]) || parseInt(row[2]) || 0,
+                            totalSpent: parseInt(row[4]) || 0,
+                            players: []
+                        };
+                    }
+                }
+            }
+        }
+
+        async function updatePlayerInSheet(player, apiKey) {
+            if (!apiKey) return;
+
+            try {
+                // Find the row for this player and update it
+                const playerIndex = players.findIndex(p => p.id === player.id);
+                if (playerIndex !== -1) {
+                    const rowIndex = playerIndex + 2; // +2 because sheets are 1-indexed and we skip header
+                    const range = `Players!F${rowIndex}:H${rowIndex}`;
+                    const values = [[player.status, player.soldTo || '', player.soldPrice || '']];
+
+                    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?valueInputOption=RAW&key=${apiKey}`;
+                    
+                    await fetch(url, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            values: values
+                        })
+                    });
+                }
+            } catch (error) {
+                console.error('Error updating player in sheet:', error);
+            }
+        }
+
+        async function updateTeamInSheet(team, apiKey) {
+            if (!apiKey) return;
+
+            try {
+                const teamIndex = team.id;
+                const rowIndex = teamIndex + 1; // +1 because sheets are 1-indexed and we skip header
+                const range = `Teams!D${rowIndex}:F${rowIndex}`;
+                const values = [[team.remainingBudget, team.totalSpent, team.players.length]];
+
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?valueInputOption=RAW&key=${apiKey}`;
+                
+                await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        values: values
+                    })
+                });
+            } catch (error) {
+                console.error('Error updating team in sheet:', error);
+            }
+        }
+
+        function updateSyncStatus(message) {
+            document.getElementById('syncStatus').textContent = message;
+        }
+
+        // Initialize
+        function init() {
+            updateTeamDisplays();
+            updateAuctionStats();
+        }
+
+        // Modal functions
+        function showSetupModal() {
+            document.getElementById('setupModal').classList.remove('hidden');
+            updatePlayersDropdown();
+        }
+
+        function hideSetupModal() {
+            document.getElementById('setupModal').classList.add('hidden');
+        }
+
+        // Setup teams
+        function setupTeams() {
+            for (let i = 1; i <= 4; i++) {
+                const name = document.getElementById(`setupTeam${i}Name`).value;
+                const city = document.getElementById(`setupTeam${i}City`).value;
+                const budget = parseInt(document.getElementById(`setupTeam${i}Budget`).value);
+
+                if (name && budget) {
+                    teams[i-1] = {
+                        id: i,
+                        name: name,
+                        city: city || 'City',
+                        totalBudget: budget,
+                        remainingBudget: budget,
+                        players: [],
+                        totalSpent: 0
+                    };
+                }
+            }
+            
+            updateTeamDisplays();
+            alert('Teams setup successfully!');
+        }
+
+        // Add player
+        function addPlayer() {
+            const name = document.getElementById('setupPlayerName').value;
+            const role = document.getElementById('setupPlayerRole').value;
+            const country = document.getElementById('setupPlayerCountry').value;
+            const age = parseInt(document.getElementById('setupPlayerAge').value);
+            const basePrice = parseInt(document.getElementById('setupPlayerBasePrice').value);
+            const lastTeam = document.getElementById('setupPlayerLastTeam').value;
+            const lastSeasonPrice = parseInt(document.getElementById('setupPlayerLastPrice').value);
+
+            if (!name || !role || !basePrice) {
+                alert('Please fill all required fields');
+                return;
+            }
+
+            const player = {
+                id: Date.now(),
+                name,
+                role,
+                country: country || 'Unknown',
+                age: age || 'Unknown',
+                basePrice,
+                status: 'available',
+                lastTeam: lastTeam || 'N/A',
+                lastSeasonPrice: lastSeasonPrice || 0
+            };
+
+            players.push(player);
+            updatePlayersList();
+            updatePlayersDropdown();
+
+            // Clear form
+            document.getElementById('setupPlayerName').value = '';
+            document.getElementById('setupPlayerRole').value = '';
+            document.getElementById('setupPlayerCountry').value = '';
+            document.getElementById('setupPlayerAge').value = '';
+            document.getElementById('setupPlayerBasePrice').value = '';
+            document.getElementById('setupPlayerLastTeam').value = '';
+            document.getElementById('setupPlayerLastPrice').value = '';
+
+            alert(`Player ${name} added successfully!`);
+        }
+
+        // Update players list in modal
+        function updatePlayersList() {
+            const list = document.getElementById('playersList');
+            if (players.length === 0) {
+                list.innerHTML = '<div class="text-gray-500 text-center py-4">No players added yet</div>';
+                return;
+            }
+
+            list.innerHTML = players.filter(p => p.status === 'available').map(player => `
+                <div class="bg-white p-3 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-medium">${player.name}</p>
+                            <p class="text-sm text-gray-600">${player.role} • ${player.country}</p>
+                        </div>
+                        <p class="font-bold text-green-600">$${player.basePrice.toLocaleString()}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update players dropdown
+        function updatePlayersDropdown() {
+            const dropdown = document.getElementById('setupCurrentPlayer');
+            dropdown.innerHTML = '<option value="">Choose Player</option>';
+            
+            players.filter(p => p.status === 'available').forEach(player => {
+                const option = document.createElement('option');
+                option.value = player.id;
+                option.textContent = `${player.name} (${player.role}) - $${player.basePrice.toLocaleString()}`;
+                dropdown.appendChild(option);
+            });
+        }
+
+        // Start player auction
+        function startPlayerAuction() {
+            const playerId = document.getElementById('setupCurrentPlayer').value;
+            bidIncrement = parseInt(document.getElementById('setupBidIncrement').value) || 50000;
+
+            if (!playerId) {
+                alert('Please select a player first');
+                return;
+            }
+
+            currentAuctionPlayer = players.find(p => p.id == playerId);
+            currentBidAmount = currentAuctionPlayer.basePrice;
+            biddingHistory = [];
+            lastBiddingTeam = null;
+
+            updatePlayerDisplay();
+            hideSetupModal();
+            
+            // Remove active state from all teams
+            document.querySelectorAll('.team-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+        }
+
+        // Update team displays
+        function updateTeamDisplays() {
+            teams.forEach(team => {
+                document.getElementById(`team${team.id}Name`).textContent = team.name;
+                document.getElementById(`team${team.id}City`).textContent = team.city;
+                document.getElementById(`team${team.id}Budget`).textContent = `$${team.remainingBudget.toLocaleString()}`;
+                document.getElementById(`team${team.id}Players`).textContent = team.players.length;
+                document.getElementById(`team${team.id}Spent`).textContent = `$${team.totalSpent.toLocaleString()}`;
+            });
+        }
+
+        // Update player display
+        function updatePlayerDisplay() {
+            if (!currentAuctionPlayer) {
+                document.getElementById('playerAvatar').textContent = '?';
+                document.getElementById('playerName').textContent = 'No Player Selected';
+                document.getElementById('playerRole').textContent = 'Select a player to start auction';
+                document.getElementById('playerDetails').textContent = 'Country • Age';
+                document.getElementById('playerLastTeam').textContent = 'Last Team: N/A';
+                document.getElementById('playerLastPrice').textContent = 'Last Season: $0';
+                document.getElementById('playerBasePrice').textContent = '$0';
+                document.getElementById('playerCurrentBid').textContent = '$0';
+                document.getElementById('currentBidDisplay').textContent = '0';
+                return;
+            }
+
+            document.getElementById('playerAvatar').textContent = currentAuctionPlayer.name.charAt(0);
+            document.getElementById('playerName').textContent = currentAuctionPlayer.name;
+            document.getElementById('playerRole').textContent = currentAuctionPlayer.role;
+            document.getElementById('playerDetails').textContent = `${currentAuctionPlayer.country} • ${currentAuctionPlayer.age}`;
+            document.getElementById('playerLastTeam').textContent = `Last Team: ${currentAuctionPlayer.lastTeam}`;
+            document.getElementById('playerLastPrice').textContent = `Last Season: $${currentAuctionPlayer.lastSeasonPrice.toLocaleString()}`;
+            document.getElementById('playerBasePrice').textContent = `$${currentAuctionPlayer.basePrice.toLocaleString()}`;
+            document.getElementById('playerCurrentBid').textContent = `$${currentBidAmount.toLocaleString()}`;
+            document.getElementById('currentBidDisplay').textContent = currentBidAmount.toLocaleString();
+        }
+
+        // Bid for team
+        function bidForTeam(teamId) {
+            if (!currentAuctionPlayer) {
+                alert('Please start an auction first from the setup panel');
+                return;
+            }
+
+            const team = teams.find(t => t.id === teamId);
+            
+            // Prevent same team from bidding twice in a row
+            if (lastBiddingTeam && lastBiddingTeam.id === teamId) {
+                alert(`${team.name} cannot bid twice in a row! Another team must bid first.`);
+                return;
+            }
+
+            const newBidAmount = currentBidAmount + bidIncrement;
+
+            if (team.remainingBudget < newBidAmount) {
+                alert(`${team.name} has insufficient budget for this bid!`);
+                return;
+            }
+
+            // Update bid
+            currentBidAmount = newBidAmount;
+            lastBiddingTeam = team;
+
+            // Add to history
+            biddingHistory.unshift({
+                team: team.name,
+                amount: currentBidAmount,
+                time: new Date().toLocaleTimeString(),
+                teamId: teamId
+            });
+
+            // Visual feedback
+            showBidFeedback(team.name);
+            highlightBiddingTeam(teamId);
+            updatePlayerDisplay();
+            updateBiddingHistory();
+
+            // Flash effect on team panel
+            const teamPanel = document.getElementById(`team${teamId}`);
+            teamPanel.classList.add('bid-flash');
+            setTimeout(() => teamPanel.classList.remove('bid-flash'), 500);
+        }
+
+        // Show bid feedback
+        function showBidFeedback(teamName) {
+            const indicator = document.getElementById('lastBidder');
+            const text = document.getElementById('lastBidderText');
+            
+            text.textContent = `${teamName} Bid $${currentBidAmount.toLocaleString()}!`;
+            indicator.classList.remove('opacity-0');
+            indicator.classList.add('opacity-100');
+            
+            setTimeout(() => {
+                indicator.classList.remove('opacity-100');
+                indicator.classList.add('opacity-0');
+            }, 2000);
+        }
+
+        // Highlight bidding team
+        function highlightBiddingTeam(teamId) {
+            // Remove active from all teams
+            document.querySelectorAll('.team-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            
+            // Add active to current bidding team
+            document.getElementById(`team${teamId}`).classList.add('active');
+        }
+
+        // Update bidding history
+        function updateBiddingHistory() {
+            const historyDiv = document.getElementById('biddingHistory');
+            if (biddingHistory.length === 0) {
+                historyDiv.innerHTML = '<div class="text-white text-center py-4 opacity-60 text-xs">No bids yet</div>';
+                return;
+            }
+
+            const teamColors = {
+                1: 'bg-blue-500',
+                2: 'bg-red-500', 
+                3: 'bg-green-500',
+                4: 'bg-purple-500'
+            };
+
+            historyDiv.innerHTML = biddingHistory.slice(0, 6).map((bid, index) => `
+                <div class="bg-white bg-opacity-15 p-2 rounded-lg border-l-4 ${teamColors[bid.teamId] || 'border-gray-400'}">
+                    <div class="flex justify-between items-center text-white">
+                        <div class="flex items-center">
+                            <span class="w-2 h-2 ${teamColors[bid.teamId] || 'bg-gray-400'} rounded-full mr-2"></span>
+                            <span class="font-medium text-xs">${bid.team}</span>
+                        </div>
+                        <span class="font-bold text-yellow-400 text-xs">$${bid.amount.toLocaleString()}</span>
+                    </div>
+                    <div class="text-xs text-gray-300 opacity-75 ml-4">${bid.time}</div>
+                </div>
+            `).join('');
+        }
+
+        // Sold player
+        async function soldPlayer() {
+            if (!currentAuctionPlayer || biddingHistory.length === 0) {
+                alert('No valid bids to complete the sale');
+                return;
+            }
+
+            const winningBid = biddingHistory[0];
+            const winningTeam = teams.find(t => t.name === winningBid.team);
+            
+            // Update team data
+            winningTeam.remainingBudget -= currentBidAmount;
+            winningTeam.totalSpent += currentBidAmount;
+            winningTeam.players.push({
+                ...currentAuctionPlayer,
+                purchasePrice: currentBidAmount
+            });
+
+            // Update player status
+            currentAuctionPlayer.status = 'sold';
+            currentAuctionPlayer.soldTo = winningTeam.name;
+            currentAuctionPlayer.soldPrice = currentBidAmount;
+
+            soldPlayers.push(currentAuctionPlayer);
+
+            // Update Google Sheets if API key is available
+            const apiKey = document.getElementById('googleApiKey').value;
+            if (apiKey) {
+                try {
+                    await updatePlayerInSheet(currentAuctionPlayer, apiKey);
+                    await updateTeamInSheet(winningTeam, apiKey);
+                } catch (error) {
+                    console.error('Error updating sheets:', error);
+                }
+            }
+
+            // Show success message
+            alert(`🎉 ${currentAuctionPlayer.name} SOLD to ${winningTeam.name} for $${currentBidAmount.toLocaleString()}!`);
+
+            // Reset auction
+            resetCurrentAuction();
+            updateTeamDisplays();
+            updateAuctionStats();
+            updatePlayersList();
+            updatePlayersDropdown();
+        }
+
+        // Unsold player
+        function unsoldPlayer() {
+            if (!currentAuctionPlayer) {
+                alert('No player selected for auction');
+                return;
+            }
+
+            currentAuctionPlayer.status = 'unsold';
+            unsoldPlayers.push(currentAuctionPlayer);
+
+            alert(`${currentAuctionPlayer.name} went UNSOLD`);
+
+            resetCurrentAuction();
+            updateAuctionStats();
+            updatePlayersList();
+            updatePlayersDropdown();
+        }
+
+        // Reset current auction
+        function resetCurrentAuction() {
+            currentAuctionPlayer = null;
+            currentBidAmount = 0;
+            biddingHistory = [];
+            lastBiddingTeam = null;
+
+            updatePlayerDisplay();
+            updateBiddingHistory();
+            
+            // Remove active state from all teams
+            document.querySelectorAll('.team-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+        }
+
+        // Update auction stats
+        function updateAuctionStats() {
+            document.getElementById('soldCount').textContent = soldPlayers.length;
+            document.getElementById('unsoldCount').textContent = unsoldPlayers.length;
+            
+            const totalValue = soldPlayers.reduce((sum, player) => sum + player.soldPrice, 0);
+            document.getElementById('totalValue').textContent = `$${totalValue.toLocaleString()}`;
+        }
+
+        // Initialize the application
+        init();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96855463c65cd71c',t:'MTc1NDA1MTI0Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
